@@ -1,0 +1,113 @@
+---
+title: "Prediction Assignment Writeup"
+author: "Nati Munoz"
+date: "16/06/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. The goal of this roject is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to predict the manner in which they did the exercise.
+
+
+## Data preparation
+
+The training and test data are given via a link. The first will be to load and explore the data.
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+
+```{r }
+Train_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+Test_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+Train_Data <- read.csv(url(Train_url), na.strings=c("NA","#DIV/0!",""))
+Test_Data <- read.csv(url(Test_url), na.strings=c("NA","#DIV/0!",""))
+
+head (Train_Data)
+head (Test_Data)
+
+```
+There are a lot of columns with NA values, which we will not be able to use for our model. There is also some columns with values near constant. We will remove these so we will only consider the variables that can affect the model.
+
+
+```{r }
+Train_Data <-Train_Data[,colSums(is.na(Train_Data)) == 0]
+Test_Data <-Test_Data[,colSums(is.na(Test_Data)) == 0]
+
+Train_Data <-Train_Data[,-c(1:7)]
+Test_Data <-Test_Data[,-c(1:7)]
+
+dim(Train_Data)
+dim(Test_Data)
+```
+
+
+In total we have now 53 variables in both the train and test data set. We can now build the model.
+
+
+## Prediction model
+Before we create the model we partion the data.
+
+```{r }
+library(caret)
+Train <- createDataPartition(Train_Data$classe, p=0.7, list=FALSE)
+training <- Train_Data[Train,]
+testing <- Train_Data[-Train,]
+
+```
+
+I will try two different models to see which one is moe accurate to use in the predictions. I will first build a ramdon forest model and then a generalised boosted model.
+
+```{r }
+library(randomForest)
+## Ramdon forest model
+model1 <- randomForest(classe ~., data=training, method="class")
+
+prediction1 <- predict(model1, testing, Type="class")
+
+confusionMatrix(prediction1, testing$classe)
+
+## Generalisedboosted model
+
+fit <- trainControl(method="repeatedcv", number=5, repeats=1)
+model2 <- train(classe ~., data=training, method="gbm", trControl=fit, verbose=FALSE)
+
+prediction2 <- predict(model2, testing)
+
+confusionMatrix(prediction2, testing$classe)
+
+
+```
+
+The accuracy of the ramdon forest model is 99.58% whereas in the general boosting model the accuracy is 96.58%. THerefore I will use the random forest model to prodict the 20 reults.
+
+
+## Prediction file
+We will apply the random forest model to the test data to predict the results. Then I will write this results to a file so it can be submitted as part of this project
+
+```{r }
+prediction <- predict(model1, Test_Data)
+prediction
+
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(prediction)
+
+```
+
+
+
+
+
+
